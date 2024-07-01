@@ -28,7 +28,7 @@ func (db DB) GetAll() ([]models.Article, error) {
 	}
 	defer conn.Release()
 
-	rows, err := conn.Query(context.Background(), "SELECT id, title, author FROM articles")
+	rows, err := conn.Query(context.Background(), "SELECT articles.id, articles.title, users.* FROM articles JOIN users_articles ON id = article_id JOIN users ON author_id = users.user_id")
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve data from database: %v", err)
 	}
@@ -36,7 +36,7 @@ func (db DB) GetAll() ([]models.Article, error) {
 
 	for rows.Next() {
 		var a models.Article
-		err := rows.Scan(&a.Id, &a.Title, &a.Author)
+		err := rows.Scan(&a.Id, &a.Title, &a.Author.Id, &a.Author.Name)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)
 		}
@@ -54,20 +54,18 @@ func (db DB) GetById(id int) (models.Article, error) {
 	}
 	defer conn.Release()
 
-	row := conn.QueryRow(context.Background(), "SELECT * FROM articles WHERE id = $1", id)
+	row := conn.QueryRow(context.Background(), "SELECT articles.*, users.* FROM articles JOIN users_articles ON id = article_id JOIN users ON author_id = users.user_id WHERE articles.id = $1", id)
 
-	err = row.Scan(&a.Id, &a.Title, &a.Content, &a.Author)
+	err = row.Scan(&a.Id, &a.Title, &a.Content, &a.Author.Id, &a.Author.Name)
 	if err != nil {
-		return models.Article{}, fmt.Errorf("failed to find article")
+		return models.Article{}, fmt.Errorf("failed to find article: %v", err)
 	}
 
 	return a, nil
 }
 
 func (db DB) GetByAuthor(id int) ([]models.Article, error) {
-	var a []models.Article
-	var rowId int
-	var article models.Article
+	var articles []models.Article
 
 	conn, err := db.pool.Acquire(context.Background())
 	if err != nil {
@@ -75,47 +73,43 @@ func (db DB) GetByAuthor(id int) ([]models.Article, error) {
 	}
 	defer conn.Release()
 
-	rows, err := conn.Query(context.Background(), "SELECT id FROM users_articles WHERE author_id = $1", id)
+	rows, err := conn.Query(context.Background(), "SELECT articles.id, articles.title, users.* FROM articles JOIN users_articles ON id = article_id JOIN users ON author_id = users.user_id WHERE users.user_id = $1", id)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve data from users_articles: %v", err)
 	}
 	defer rows.Close()
 
-	// for rows.Next() {
-	// 	err = rows.Scan(&rowId)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("unable to scan row from users_articles: %v", err)
-	// 	}
+	for rows.Next() {
+		var a models.Article
+		err := rows.Scan(&a.Id, &a.Title, &a.Author)
+		if err != nil {
+			return nil, fmt.Errorf("unable to scan row: %v", err)
+		}
+		articles = append(articles, a)
 
-	// 	articleRows, err := conn.Query(context.Background(), "SELECT id, title, author FROM articles WHERE id = $1", id)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("unable to retrieve data from articles: %v", err)
-	// 	}
-	// 	defer articleRows.Close()
+	}
 
-	// 	for articleRows.Next() {
-	// 		err = articleRows.Scan(&article.Id, &article.Title, &article.Author)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("unable to scan row from articles: %v", err)
-	// 		}
-
-	// 		a = append(a, article)
-	// 	}
-	// }
-
-	return a, nil
+	return articles, nil
 }
 
 func (db DB) CreateArticle(a models.Article) error {
+	var articleId int
 	conn, err := db.pool.Acquire(context.Background())
 	if err != nil {
 		return fmt.Errorf("unable to acquire a database connection: %v", err)
 	}
 	defer conn.Release()
 
-	_, err = conn.Exec(context.Background(), "INSERT INTO articles(title, content, author) VALUES ($1, $2, $3)", a.Title, a.Content, a.Author)
+	row := conn.QueryRow(context.Background(), "INSERT INTO articles(title, content) VALUES ($1, $2) RETURNING id", a.Title, a.Content)
+	err = row.Scan(&articleId)
 	if err != nil {
 		return fmt.Errorf("unable to insert: %v", err)
+	}
+
+	_, err = conn.Exec(context.Background(), "INSERT INTO users_articles(author_id, article_id) VALUES ($1, $2)", a.Author.Id, articleId)
+	fmt.Print("authorUd", a.Author.Id)
+	if err != nil {
+		return fmt.Errorf("unable to insert into mapping table: %v", err)
 	}
 	return nil
 }

@@ -42,13 +42,14 @@ func main() {
 	h := handlers.NewBaseHandler(db.NewDB(pool))
 
 	r := gin.Default()
-	v1 := r.Group("/")
+	v1 := r.Group("/articles")
 	{
 		v1.GET("", h.GetAll)
 		v1.GET(":id", h.GetById)
 		v1.POST("", h.CreateArticle)
 		v1.PUT("", h.UpdateArticle)
 		v1.DELETE(":id", h.DeleteArticle)
+		v1.GET("/author/:id", h.GetByAuthor)
 	}
 
 	r.Run()

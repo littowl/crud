@@ -1,5 +1,5 @@
 -- up.sql
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(30) NOT NULL
+    user_id SERIAL PRIMARY KEY,
+    user_name VARCHAR(30) NOT NULL
 );
