@@ -12,7 +12,7 @@ import (
 func (h BaseHandler) GetAll(c *gin.Context) {
 	articles, err := h.db.GetAll()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		fmt.Printf("error:%v", err)
 		return
 	}
@@ -56,12 +56,12 @@ func (h BaseHandler) GetByAuthor(c *gin.Context) {
 func (h BaseHandler) CreateArticle(c *gin.Context) {
 	var article models.Article
 	if err := c.BindJSON(&article); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		fmt.Printf("error:%v", err)
 		return
 	}
 	if err := h.db.CreateArticle(article); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		fmt.Printf("error:%v", err)
 		return
 	}
@@ -73,14 +73,14 @@ func (h BaseHandler) UpdateArticle(c *gin.Context) {
 
 	err := c.BindJSON(&article)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		fmt.Printf("error:%v", err)
 		return
 	}
 
 	err = h.db.UpdateArticle(article)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		fmt.Printf("error:%v", err)
 		return
 	}

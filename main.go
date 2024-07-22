@@ -4,6 +4,7 @@ import (
 	"context"
 	"crud/db"
 	"crud/handlers"
+	"crud/middleware"
 	"fmt"
 	"log"
 	"os"
@@ -42,14 +43,25 @@ func main() {
 	h := handlers.NewBaseHandler(db.NewDB(pool))
 
 	r := gin.Default()
-	v1 := r.Group("/articles")
+
+	commonRoutes := r.Group("/articles")
 	{
-		v1.GET("", h.GetAll)
-		v1.GET(":id", h.GetById)
-		v1.POST("", h.CreateArticle)
-		v1.PUT("", h.UpdateArticle)
-		v1.DELETE(":id", h.DeleteArticle)
-		v1.GET("/author/:id", h.GetByAuthor)
+		commonRoutes.GET("", h.GetAll)
+		commonRoutes.GET(":id", h.GetById)
+		commonRoutes.GET("/author/:id", h.GetByAuthor)
+	}
+
+	routesWithAuth := r.Group("/articles").Use(middleware.Authenticate())
+	{
+		routesWithAuth.POST("", h.CreateArticle)
+		routesWithAuth.PUT("", h.UpdateArticle)
+		routesWithAuth.DELETE(":id", h.DeleteArticle)
+	}
+
+	authRoutes := r.Group("/auth")
+	{
+		authRoutes.POST("/register", h.Register)
+		authRoutes.POST("/login", h.Login)
 	}
 
 	r.Run()

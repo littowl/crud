@@ -1,5 +1,5 @@
 -- up.sql
 CREATE TABLE IF NOT EXISTS users (
-    user_id SERIAL PRIMARY KEY,
+    user_id SERIAL PRIMARY KEY REFERENCES auth (id) ON DELETE CASCADE,
     user_name VARCHAR(30) NOT NULL
 );

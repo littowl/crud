@@ -81,7 +81,7 @@ func (db DB) GetByAuthor(id int) ([]models.Article, error) {
 
 	for rows.Next() {
 		var a models.Article
-		err := rows.Scan(&a.Id, &a.Title, &a.Author)
+		err := rows.Scan(&a.Id, &a.Title, &a.Author.Id, &a.Author.Name)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)
 		}
@@ -107,7 +107,6 @@ func (db DB) CreateArticle(a models.Article) error {
 	}
 
 	_, err = conn.Exec(context.Background(), "INSERT INTO users_articles(author_id, article_id) VALUES ($1, $2)", a.Author.Id, articleId)
-	fmt.Print("authorUd", a.Author.Id)
 	if err != nil {
 		return fmt.Errorf("unable to insert into mapping table: %v", err)
 	}

@@ -11,3 +11,11 @@ type Article struct {
 	Content string `json:"content,omitempty" db:"content"`
 	Author  User   `json:"author"`
 }
+
+type Auth struct {
+	Id       int
+	Login    string `json:"login"`
+	Password string `json:"password"`
+	Username string `json:"username,omitempty"`
+	Hash     string
+}
