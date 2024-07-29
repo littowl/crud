@@ -3,7 +3,9 @@ package handlers
 import (
 	"crud/models"
 	"fmt"
+	"math/rand"
 	"net/http"
+	"net/smtp"
 	"os"
 	"time"
 
@@ -11,6 +13,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func generateHash() string {
+	b := make([]byte, 10)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 
 func (h BaseHandler) Register(c *gin.Context) {
 	var a models.Auth
@@ -28,6 +40,13 @@ func (h BaseHandler) Register(c *gin.Context) {
 		return
 	}
 
+	user, err := h.db.GetUser(models.Auth{Login: a.Login})
+	if user != (models.Auth{}) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user with this email is already existed"})
+		fmt.Printf("%v", err)
+		return
+	}
+
 	passHash, err := bcrypt.GenerateFromPassword([]byte(a.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
@@ -36,22 +55,70 @@ func (h BaseHandler) Register(c *gin.Context) {
 	}
 
 	a.Hash = string(passHash)
+	a.Link = fmt.Sprintf("127.0.0.1:5000/auth/verify?login=%s&hash=%v", a.Login, generateHash())
 
-	err = h.db.Register(a)
+	// Sender data.
+	from := os.Getenv("EMAIL")
+	password := os.Getenv("EMAIL_PASSWORD")
+
+	// Receiver email address.
+	to := []string{
+		a.Login,
+	}
+
+	// smtp server configuration.
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+
+	subject := "Subject: Confirmation\n"
+	message := []byte(subject + "\n" + a.Link)
+
+	// Authentication.
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	// Sending email.
+	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, message)
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		fmt.Println(err)
+		return
+	}
 
-		if err.Error() == "user with this login already exists" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			fmt.Printf("error:%v", err)
-			return
-		}
+	h.cache.Set(a.Login, a, time.Hour*2)
+	c.JSON(http.StatusOK, "Email Sent Successfully!")
+}
 
+func (h BaseHandler) Verify(c *gin.Context) {
+	login, ok := c.GetQuery("login")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "incorrect link"})
+		fmt.Printf("error while getting login: %v", "incorrect link")
+		return
+	}
+
+	data, found := h.cache.Get(login)
+
+	if !found {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "link has expired"})
+		fmt.Printf("error: %v", "link has expired")
+		return
+	}
+	fmt.Print(c.Request.Host+c.Request.RequestURI, data.(models.Auth).Link)
+	if (c.Request.Host + c.Request.RequestURI) != data.(models.Auth).Link {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "incorrect link"})
+		fmt.Printf("error while hash check: %v", "incorrect link")
+		return
+	}
+
+	err := h.db.Register(data.(models.Auth))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		fmt.Printf("%v", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, "user was registered")
+	h.cache.Delete(login)
+	c.JSON(http.StatusOK, "user was veryfied")
 }
 
 func (h BaseHandler) Login(c *gin.Context) {

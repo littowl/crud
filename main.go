@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-migrate/migrate/v4"
@@ -15,6 +16,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lpernett/godotenv"
+	"github.com/patrickmn/go-cache"
 )
 
 func main() {
@@ -40,7 +42,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	h := handlers.NewBaseHandler(db.NewDB(pool))
+	cache := cache.New(5*time.Hour, 10*time.Hour)
+
+	h := handlers.NewBaseHandler(db.NewDB(pool), cache)
 
 	r := gin.Default()
 
@@ -61,6 +65,7 @@ func main() {
 	authRoutes := r.Group("/auth")
 	{
 		authRoutes.POST("/register", h.Register)
+		authRoutes.GET("/verify", h.Verify)
 		authRoutes.POST("/login", h.Login)
 	}
 

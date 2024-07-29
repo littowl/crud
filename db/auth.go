@@ -13,10 +13,6 @@ func (db DB) Register(a models.Auth) error {
 	}
 	defer conn.Release()
 
-	rows, _ := conn.Query(context.Background(), "SELECT * FROM auth WHERE login = $1", &a.Login)
-	if rows.Next() {
-		return fmt.Errorf("user with this login already exists")
-	}
 	err = conn.QueryRow(context.Background(), "INSERT INTO auth(login, pass_hash) VALUES ($1, $2) RETURNING id", &a.Login, &a.Hash).Scan(&a.Id)
 	if err != nil {
 		return fmt.Errorf("unable to register new user: %v", err)
@@ -43,5 +39,4 @@ func (db DB) GetUser(a models.Auth) (models.Auth, error) {
 	}
 
 	return a, nil
-
 }

@@ -32,10 +32,11 @@ func validateToken(signedToken string) (claims *SignedDetails, msg string) {
 	}
 
 	claims, ok := token.Claims.(*SignedDetails)
+
 	if !ok {
 		return &SignedDetails{}, "error: "
 	}
-	fmt.Print("\n claims.exp: ", claims.Login, claims.Exp, " end.") // ошибка потому что в указатель на структуру не записались значения
+
 	if claims.Exp < time.Now().Local().Unix() {
 		return &SignedDetails{}, "token is expired"
 	}
@@ -43,6 +44,7 @@ func validateToken(signedToken string) (claims *SignedDetails, msg string) {
 	return claims, msg
 }
 
+// сюда наверное можно пихнуть проверку роли?
 func Authenticate() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientToken := c.Request.Header.Get("Auth")
@@ -52,7 +54,6 @@ func Authenticate() gin.HandlerFunc {
 			return
 		}
 		claims, err := validateToken(clientToken)
-		fmt.Print(claims, claims.Login)
 		if err != "" {
 			if strings.Contains(err, "token is expired") {
 				c.JSON(401, gin.H{"error": "Auth token is expired"})
@@ -64,10 +65,9 @@ func Authenticate() gin.HandlerFunc {
 			fmt.Print("err after validate token: ", err)
 			return
 		}
-		fmt.Print("\n no err \n")
+
 		c.Set("Login", claims.Login)
 		c.Set("Uid", claims.Uid)
 		c.Next()
-
 	}
 }
