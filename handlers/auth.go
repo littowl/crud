@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crud/db"
 	"crud/models"
 	"fmt"
 	"math/rand"
@@ -11,8 +12,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type authService struct {
+	db    *db.DB
+	cache *cache.Cache
+}
+
+func NewAuthService(db *db.DB, cache *cache.Cache) models.AuthService {
+	return &authService{
+		db:    db,
+		cache: cache,
+	}
+}
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -24,7 +38,7 @@ func generateHash() string {
 	return string(b)
 }
 
-func (h BaseHandler) Register(c *gin.Context) {
+func (s authService) Register(c *gin.Context) {
 	var a models.Auth
 
 	err := c.BindJSON(&a)
@@ -40,7 +54,7 @@ func (h BaseHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUser(models.Auth{Login: a.Login})
+	user, err := s.db.GetUser(models.Auth{Login: a.Login})
 	if user != (models.Auth{}) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user with this email is already existed"})
 		fmt.Printf("%v", err)
@@ -84,11 +98,11 @@ func (h BaseHandler) Register(c *gin.Context) {
 		return
 	}
 
-	h.cache.Set(a.Login, a, time.Hour*2)
+	s.cache.Set(a.Login, a, time.Hour*2)
 	c.JSON(http.StatusOK, "Email Sent Successfully!")
 }
 
-func (h BaseHandler) Verify(c *gin.Context) {
+func (s authService) Verify(c *gin.Context) {
 	login, ok := c.GetQuery("login")
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "incorrect link"})
@@ -96,7 +110,7 @@ func (h BaseHandler) Verify(c *gin.Context) {
 		return
 	}
 
-	data, found := h.cache.Get(login)
+	data, found := s.cache.Get(login)
 
 	if !found {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "link has expired"})
@@ -110,18 +124,18 @@ func (h BaseHandler) Verify(c *gin.Context) {
 		return
 	}
 
-	err := h.db.Register(data.(models.Auth))
+	err := s.db.Register(data.(models.Auth))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		fmt.Printf("%v", err)
 		return
 	}
 
-	h.cache.Delete(login)
+	s.cache.Delete(login)
 	c.JSON(http.StatusOK, "user was veryfied")
 }
 
-func (h BaseHandler) Login(c *gin.Context) {
+func (s authService) Login(c *gin.Context) {
 	var a models.Auth
 
 	err := c.BindJSON(&a)
@@ -131,7 +145,7 @@ func (h BaseHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUser(a)
+	user, err := s.db.GetUser(a)
 	if err != nil {
 		if err.Error() == "failed to find user with this login" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

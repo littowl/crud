@@ -44,7 +44,10 @@ func main() {
 
 	cache := cache.New(5*time.Hour, 10*time.Hour)
 
-	h := handlers.NewBaseHandler(db.NewDB(pool), cache)
+	newDB := db.NewDB(pool)
+
+	h := handlers.NewArticleService(newDB)
+	a := handlers.NewAuthService(newDB, cache)
 
 	r := gin.Default()
 
@@ -64,9 +67,9 @@ func main() {
 
 	authRoutes := r.Group("/auth")
 	{
-		authRoutes.POST("/register", h.Register)
-		authRoutes.GET("/verify", h.Verify)
-		authRoutes.POST("/login", h.Login)
+		authRoutes.POST("/register", a.Register)
+		authRoutes.GET("/verify", a.Verify)
+		authRoutes.POST("/login", a.Login)
 	}
 
 	r.Run()
